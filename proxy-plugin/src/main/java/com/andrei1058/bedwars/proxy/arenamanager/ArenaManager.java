@@ -116,32 +116,28 @@ public class ArenaManager implements BedWars.ArenaUtil {
      * Add a player to the most filled arena from a group.
      */
     public boolean joinRandomFromGroup(@NotNull Player p, String group) {
+
         if (getParty().hasParty(p.getUniqueId()) && !getParty().isOwner(p.getUniqueId())) {
             p.sendMessage(LanguageManager.get().getMsg(p, Messages.COMMAND_JOIN_DENIED_NOT_PARTY_LEADER));
             return false;
         }
 
-        List<CachedArena> arenaList = new ArrayList<>();
-        getArenas().forEach(a -> {
-            if (a.getArenaGroup().equalsIgnoreCase(group)) arenaList.add(a);
-        });
-        arenaList.sort(getComparator());
+        final int amount = BedWarsProxy.getParty().hasParty(p.getUniqueId()) ? BedWarsProxy.getParty().getMembers(p.getUniqueId()).size() : 1;
 
-        //shuffle if determined in config
-        if (config.getYml().getBoolean(ConfigPath.GENERAL_CONFIGURATION_RANDOMARENAS)){
-            Collections.shuffle(arenaList);
+        final CachedArena arena = getArenas().stream()
+            .filter(a -> a.getArenaGroup().equalsIgnoreCase(group))
+            .filter(a -> a.getStatus() == ArenaStatus.WAITING || a.getStatus() == ArenaStatus.STARTING)
+            .filter(a -> a.getCurrentPlayers() + amount <= a.getMaxPlayers())
+            .max(Comparator.comparingInt(CachedArena::getCurrentPlayers))
+            .orElse(null);
+
+        if (arena == null) {
+            p.sendMessage(LanguageManager.get().getMsg(p, Messages.COMMAND_JOIN_NO_EMPTY_FOUND));
+            return true;
         }
 
+        arena.addPlayer(p, null);
 
-        int amount = BedWarsProxy.getParty().hasParty(p.getUniqueId()) ? BedWarsProxy.getParty().getMembers(p.getUniqueId()).size() : 1;
-        for (CachedArena a : arenaList) {
-            if (a.getCurrentPlayers() >= a.getMaxPlayers()) continue;
-            if (a.getMaxPlayers() - a.getCurrentPlayers() >= amount) {
-                a.addPlayer(p, null);
-                return true;
-            }
-        }
-        p.sendMessage(LanguageManager.get().getMsg(p, Messages.COMMAND_JOIN_NO_EMPTY_FOUND));
         return true;
     }
 
@@ -160,21 +156,26 @@ public class ArenaManager implements BedWars.ArenaUtil {
      * Check if is the party owner first.
      */
     public boolean joinRandomArena(@NotNull Player p) {
+
         if (getParty().hasParty(p.getUniqueId()) && !getParty().isOwner(p.getUniqueId())) {
             p.sendMessage(LanguageManager.get().getMsg(p, Messages.COMMAND_JOIN_DENIED_NOT_PARTY_LEADER));
             return false;
         }
-        List<CachedArena> arenaList = new ArrayList<>(getArenas());
-        arenaList.sort(getComparator());
 
-        int amount = BedWarsProxy.getParty().hasParty(p.getUniqueId()) ? BedWarsProxy.getParty().getMembers(p.getUniqueId()).size() : 1;
-        for (CachedArena a : arenaList) {
-            if (a.getCurrentPlayers() >= a.getMaxPlayers()) continue;
-            if (a.getMaxPlayers() - a.getCurrentPlayers() >= amount) {
-                a.addPlayer(p, null);
-                break;
-            }
+        final int amount = BedWarsProxy.getParty().hasParty(p.getUniqueId()) ? BedWarsProxy.getParty().getMembers(p.getUniqueId()).size() : 1;
+
+        final CachedArena arena = getArenas().stream()
+            .filter(a -> a.getStatus() == ArenaStatus.WAITING || a.getStatus() == ArenaStatus.STARTING)
+            .filter(a -> a.getCurrentPlayers() + amount <= a.getMaxPlayers())
+            .max(Comparator.comparingInt(CachedArena::getCurrentPlayers))
+            .orElse(null);
+
+        if (arena == null) {
+            return false;
         }
+
+        arena.addPlayer(p, null);
+
         return true;
     }
 

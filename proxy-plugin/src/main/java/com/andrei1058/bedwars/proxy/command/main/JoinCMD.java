@@ -45,18 +45,21 @@ public class JoinCMD extends SubCommand {
                 p.sendMessage(getMsg(p, Messages.COMMAND_JOIN_DENIED_NOT_PARTY_LEADER));
                 return;
             }
-            ArrayList<CachedArena> arenas = new ArrayList<>();
-            ArenaManager.getArenas().forEach(a -> {
-                if (a.getArenaName().contains(args[0])) arenas.add(a);
-            });
-            arenas.removeIf(a -> !(a.getStatus() == ArenaStatus.WAITING || a.getStatus() == ArenaStatus.STARTING));
-            arenas.sort(ArenaManager.getComparator());
-            if (!arenas.isEmpty()){
-                arenas.get(0).addPlayer(p, null);
+
+            final CachedArena arena = ArenaManager.getArenas().stream()
+                .filter(a -> a.getArenaName().contains(args[0]))
+                .filter(a -> a.getStatus() == ArenaStatus.WAITING || a.getStatus() == ArenaStatus.STARTING)
+                .filter(a -> a.getCurrentPlayers() + 1 <= a.getMaxPlayers())
+                .max(Comparator.comparingInt(CachedArena::getCurrentPlayers))
+                .orElse(null);
+
+            if (arena == null) {
+                s.sendMessage(getMsg(p, Messages.COMMAND_JOIN_GROUP_OR_ARENA_NOT_FOUND).replace("{name}", args[0]));
                 return;
             }
+
+            arena.addPlayer(p, null);
         }
-        s.sendMessage(getMsg(p, Messages.COMMAND_JOIN_GROUP_OR_ARENA_NOT_FOUND).replace("{name}", args[0]));
     }
 
     @Override
